@@ -1,0 +1,7 @@
+`include "axi_lite_pkg.sv"
+`include "axi_lite_if.sv"
+`include "axi_lite_addr_decoder.sv"
+`include "axi_lite_reg_bank.sv"
+`include "axi_lite_write_channel.sv"
+`include "axi_lite_read_channel.sv"
+`include "axi_lite_slave_top.sv"
