@@ -1,6 +1,6 @@
-# AXI4-Lite Slave: RTL and UVM Verification
+# AXI4-Lite Slave IP with UVM, SVA, and Coverage-Driven Verification
 
-An **AXI4-Lite slave IP** in SystemVerilog (16 registers, byte strobes, `DECERR` handling) with two verification environments: a self-checking Verilator testbench and a **UVM 1.2 testbench** with a scoreboard-based register model.
+An **AXI4-Lite slave IP** in SystemVerilog (16 registers, byte strobes, `DECERR` handling) with two verification environments: a self-checking Verilator testbench and a **UVM 1.2 testbench** with a scoreboard-based register model, protocol assertions (SVA), and functional coverage.
 
 ## Features
 
@@ -40,19 +40,21 @@ Only word-aligned addresses in this range are valid. Any other address returns `
 │   └── tb_axi_lite_slave.sv        # self-checking testbench (Verilator)
 ├── uvm/                            # UVM environment
 │   ├── axi_lite_uvm_pkg.sv         # package: includes all classes below
-│   ├── tb_top.sv                   # clock, reset, DUT, config_db, run_test
-│   ├── axi_lite_item.sv
+│   ├── tb_top.sv                   # clock, reset, DUT, SVA instance, config_db, run_test
+│   ├── axi_lite_sva.sv             # protocol assertions and cover properties (module)
+│   ├── axi_lite_item.sv            # transaction with randomized delays and strobes
 │   ├── axi_lite_sequence.sv        # directed: write then read back
 │   ├── axi_lite_rand_seq.sv        # random read/write traffic
 │   ├── axi_lite_sequencer.sv
 │   ├── axi_lite_driver.sv
 │   ├── axi_lite_monitor.sv
+│   ├── axi_lite_coverage.sv        # functional coverage (uvm_subscriber)
 │   ├── axi_lite_agent.sv
 │   ├── axi_lite_scoreboard.sv
 │   ├── axi_lite_env.sv
 │   ├── axi_lite_test.sv
 │   ├── design.sv                   # EDA Playground: includes the RTL files
-│   └── testbench.sv                # EDA Playground: includes the UVM package and tb_top
+│   └── testbench.sv                # EDA Playground: includes SVA, UVM package, tb_top
 ├── Makefile
 └── README.md
 ```
@@ -68,21 +70,36 @@ Directed tests for write and read transactions, AW-first / W-first / simultaneou
 Simulator: Questa, library: UVM 1.2. Paste `design.sv`, `testbench.sv`, and the other files from `uvm/` as separate tabs.
 
 ```
-test
- └── env
-      ├── agent
-      │    ├── sequencer
-      │    ├── driver      (master: AW / W / B and AR / R handshakes)
-      │    └── monitor     (rebuilds transactions from handshakes)
-      └── scoreboard       (16-register reference model, WSTRB-aware)
+tb_top
+ ├── DUT + interface
+ ├── axi_lite_sva                  (assertions and covers on the interface signals)
+ └── test
+      └── env
+           ├── agent
+           │    ├── sequencer
+           │    ├── driver         (master: AW / W / B and AR / R handshakes)
+           │    └── monitor        (rebuilds transactions from handshakes)
+           ├── scoreboard          (16-register reference model, WSTRB-aware)
+           └── coverage            (covergroup, sampled from the monitor)
 ```
 
-- **Driver:** drives AW and W concurrently (`fork ... join`), then collects the write response; drives AR then R for reads.
-- **Monitor:** one watcher per channel, with queues pairing AW/W with B and AR with R. It publishes complete transactions through an analysis port.
+- **Driver:** drives AW and W concurrently (`fork ... join`) with a randomized delay on each channel, so AW-first, W-first, and same-cycle writes can all occur. Randomized delays are also applied before `BREADY` and `RREADY` (response backpressure).
+- **Monitor:** one watcher per channel, with queues pairing AW/W with B and AR with R. It publishes complete transactions through an analysis port, which feeds both the scoreboard and the coverage collector.
 - **Scoreboard:** keeps a model of the register file, applies `WSTRB` byte lanes on writes, and checks read data and response codes (`OKAY` for valid addresses, `DECERR` for invalid).
-- **Sequences:** a directed write-then-read sequence, and a random read/write sequence that only reads addresses it has already written.
+- **Sequences:** a directed write-then-read sequence, and a random read/write sequence that only reads addresses it has already written. Strobes are weighted toward full-word writes, with some zero and partial strobes.
+- **SVA module:** 18 concurrent assertions on the AXI signals, plus cover properties. Categories: VALID/payload stability on all five channels, response-after-request ordering (using handshake counters), legal `BRESP`/`RRESP` values, no new request accepted while a response is pending, bounded `BVALID`/`RVALID` latency, one-shot responses, no X on slave outputs, and reset behavior. Assertions on master-driven signals also act as checks on the driver.
+- **Functional coverage:** a covergroup over operation, register address class (16 registers, misaligned, out of range), write strobe pattern, and response, with crosses of operation x address and strobe x response.
 
-**Current result:** 50 random read/write transactions across all 16 registers, 0 scoreboard errors.
+**Latest run (random test, 200 transactions: 110 writes, 90 reads):**
+
+| Check | Result |
+|-------|--------|
+| Scoreboard errors | 0 |
+| Assertion failures | 0 |
+| Functional coverage (total) | 84.72% |
+| Operation / address / strobe / response | 100% / 88.89% / 100% / 50% |
+
+All 16 registers were accessed and all 9 write-strobe bins were hit. The remaining coverage holes are the `misaligned` and `out_of_range` address bins and the `DECERR` response bin: the random sequence currently sends only valid addresses, so the invalid-address (`DECERR`) paths are not yet exercised in UVM. (Invalid addresses are covered in the Verilator testbench.)
 
 ## Bug Found by the UVM Environment
 
@@ -94,22 +111,9 @@ The random test exposed a real RTL bug that a directed test on address `0x00` ha
 - **Fix:** hold `read_index = reg_index` in `RD_RESP` as well.
 - **Result:** the random test passes with 0 scoreboard errors after the fix.
 
-## Status and Planned Work
-
-| Item | Status |
-|------|--------|
-| UVM agent, monitor, scoreboard with register model | Done |
-| Directed and random sequences | Done |
-| Randomized AW/W delays (AW-first, W-first, same-cycle) | Planned |
-| Invalid-address stimulus (`DECERR` paths) | Planned |
-| Partial and zero `WSTRB`, delayed `BREADY` / `RREADY` | Planned |
-| Protocol SVA bound to the interface | Planned |
-| Functional coverage with cross coverage | Planned |
-| RTL bug injection to measure testbench effectiveness | Planned |
-
 ## Tools
 
-SystemVerilog, UVM 1.2, Questa (EDA Playground), Verilator, GTKWave, Make
+SystemVerilog, UVM 1.2, SVA, Questa (EDA Playground), Verilator, GTKWave, Make
 
 ## Learning Objectives
 
@@ -117,4 +121,5 @@ SystemVerilog, UVM 1.2, Questa (EDA Playground), Verilator, GTKWave, Make
 - Memory-mapped register interfaces and byte-enable logic
 - UVM testbench architecture (agent, monitor, scoreboard, sequences)
 - Constrained-random verification and reference-model checking
+- SystemVerilog Assertions and functional coverage
 - Debugging with waveforms and scoreboard logs

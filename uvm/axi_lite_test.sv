@@ -19,7 +19,7 @@ class axi_lite_test extends uvm_test;
   virtual task run_phase(uvm_phase phase);
     // axi_lite_sequence m_seq = axi_lite_sequence::type_id::create("m_seq");
     axi_lite_rand_seq m_seq = axi_lite_rand_seq::type_id::create("m_seq");
-    m_seq.num_items = 50;
+    m_seq.num_items = 200;
     m_seq.set_starting_phase(phase);
     m_seq.start(m_env.m_agent.m_sequencer);
   endtask

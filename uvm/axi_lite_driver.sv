@@ -14,7 +14,6 @@ class axi_lite_driver extends uvm_driver #(axi_lite_item);
   endfunction
   
   virtual task run_phase(uvm_phase phase);
-    axi_lite_item req;
     init_signals();
     wait(vif.ARESETn === 1'b1);
     forever begin
@@ -43,6 +42,7 @@ class axi_lite_driver extends uvm_driver #(axi_lite_item);
     vif.ARVALID <= 1;
     do @(posedge vif.ACLK); while(!vif.ARREADY);
     vif.ARVALID <= 0;
+    repeat (item.r_delay) @(posedge vif.ACLK);
     vif.RREADY  <= 1;
     do @(posedge vif.ACLK); while(!vif.RVALID);
     item.rdata   = vif.RDATA;
@@ -56,6 +56,7 @@ class axi_lite_driver extends uvm_driver #(axi_lite_item);
       drive_w(item);
     join
     
+    repeat (item.b_delay) @(posedge vif.ACLK);
     vif.BREADY  <= 1;
     do @(posedge vif.ACLK); while(!vif.BVALID);
     item.resp    = vif.BRESP;
@@ -63,7 +64,8 @@ class axi_lite_driver extends uvm_driver #(axi_lite_item);
   endtask
   
     
-  task drive_aw(axi_lite_item item);  
+  task drive_aw(axi_lite_item item);
+    repeat (item.aw_delay) @(posedge vif.ACLK);
     @(posedge vif.ACLK);
     vif.AWADDR  <= item.addr;
     vif.AWVALID <= 1;
@@ -72,6 +74,7 @@ class axi_lite_driver extends uvm_driver #(axi_lite_item);
   endtask
     
   task drive_w(axi_lite_item item);
+    repeat (item.w_delay) @(posedge vif.ACLK);
     @(posedge vif.ACLK);
     vif.WDATA  <= item.data;
     vif.WSTRB  <= item.strb;

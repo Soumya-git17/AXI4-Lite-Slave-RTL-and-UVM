@@ -6,6 +6,7 @@ import axi_lite_uvm_pkg::*;
 module tb_top;
   axi_lite_if axi_if();
   axi_lite_slave_top dut(.axi_if(axi_if));
+  axi_lite_sva sva(axi_if);
   
   initial axi_if.ACLK = 0;
   always #5 axi_if.ACLK = ~axi_if.ACLK;

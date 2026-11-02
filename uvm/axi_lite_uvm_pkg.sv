@@ -9,7 +9,7 @@ package axi_lite_uvm_pkg;
   `include "axi_lite_sequencer.sv"
   `include "axi_lite_driver.sv"
   `include "axi_lite_monitor.sv"
-  // `include "axi_lite_coverage.sv"
+  `include "axi_lite_coverage.sv"
   `include "axi_lite_agent.sv"
   `include "axi_lite_scoreboard.sv"
   `include "axi_lite_env.sv"

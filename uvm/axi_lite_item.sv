@@ -4,6 +4,8 @@ class axi_lite_item extends uvm_sequence_item;
   rand bit [ADDR_WIDTH-1:0] addr;
   rand bit [DATA_WIDTH-1:0] data;
   rand bit [STRB_WIDTH-1:0] strb;
+
+  rand int unsigned aw_delay, w_delay, b_delay, r_delay;
   
   resp_t resp;
   bit [DATA_WIDTH-1:0] rdata;
@@ -24,16 +26,31 @@ class axi_lite_item extends uvm_sequence_item;
       addr[1:0] == 2'b00;
       addr inside {[0:'h3C]};
     }
+    else {
+      (addr[1:0] != 2'b00) || (addr > 'h3C);
+    }
   }
       
   constraint c_rd_clean { if(!is_write) {data == 0; strb == 0;}}
+
+  constraint c_delay {
+    aw_delay dist {0 := 5, [1:5] :/ 5};
+    w_delay  dist {0 := 5, [1:5] :/ 5};
+    b_delay  dist {0 := 5, [1:5] :/ 5};
+    r_delay  dist {0 := 5, [1:5] :/ 5};
+  }
+
+  constraint c_strb {
+    if (is_write) strb dist {4'hF := 4, 4'h0 := 1, [4'h1:4'hE] :/ 5};
+  }
   
   function new(string name = "axi_lite_item");
     super.new(name);
   endfunction
   
   function string convert2string();
-    return $sformatf("%s addr=0x%08h data=0x%08h strb=%04b resp=%s rdata=0x%08h", is_write ? "WR" : "RD", addr, data, strb, resp.name(), rdata);
+    return $sformatf("%s addr=0x%08h data=0x%08h strb=%04b resp=%s rdata=0x%08h aw_d=%0d w_d=%0d",
+                    is_write ? "WR" : "RD", addr, data, strb, resp.name(), rdata, aw_delay, w_delay);
   endfunction
-    
+
 endclass
