@@ -38,10 +38,11 @@ Only word-aligned addresses in this range are valid. Any other address returns `
 │   └── axi_lite_slave_top.sv
 ├── tb/
 │   └── tb_axi_lite_slave.sv        # self-checking testbench (Verilator)
+├── sva/
+│   └── axi_lite_sva.sv             # protocol assertions and cover properties (module)
 ├── uvm/                            # UVM environment
 │   ├── axi_lite_uvm_pkg.sv         # package: includes all classes below
 │   ├── tb_top.sv                   # clock, reset, DUT, SVA instance, config_db, run_test
-│   ├── axi_lite_sva.sv             # protocol assertions and cover properties (module)
 │   ├── axi_lite_item.sv            # transaction with randomized delays and strobes
 │   ├── axi_lite_sequence.sv        # directed: write then read back
 │   ├── axi_lite_rand_seq.sv        # random read/write traffic
@@ -56,6 +57,8 @@ Only word-aligned addresses in this range are valid. Any other address returns `
 │   ├── design.sv                   # EDA Playground: includes the RTL files
 │   └── testbench.sv                # EDA Playground: includes SVA, UVM package, tb_top
 ├── Makefile
+├──.gitignore
+├── LICENSE 
 └── README.md
 ```
 
